@@ -212,7 +212,9 @@ module Jekyll
         "topics" => self.topics,
         "categories" => self.categories,
         "next" => self.next,
+        "next_in_categories" => self.next_in_categories,
         "previous" => self.previous,
+        "previous_in_categories" => self.previous_in_categories,
         "content" => self.content }.deep_merge(self.data)
     end
 
@@ -234,6 +236,27 @@ module Jekyll
       pos = self.site.posts.index(self)
       if pos && pos > 0
         self.site.posts[pos-1]
+      else
+        nil
+      end
+    end
+
+    def next_in_categories
+      set = self.categories.map { |cat| self.site.categories[cat] }.flatten.uniq.sort
+      pos = set.index(self)
+
+      if pos && pos < set.length-1
+        set[pos+1]
+      else
+        nil
+      end
+    end
+    
+    def previous_in_categories
+      set = self.categories.map { |cat| self.site.categories[cat] }.flatten.uniq.sort
+      pos = set.index(self)
+      if pos && pos > 0
+        set[pos-1]
       else
         nil
       end
