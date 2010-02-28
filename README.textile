@@ -10,6 +10,7 @@ h2. Getting Started
 * Read up about its "Usage":http://wiki.github.com/mojombo/jekyll/usage and "Configuration":http://wiki.github.com/mojombo/jekyll/configuration
 * Take a gander at some existing "Sites":http://wiki.github.com/mojombo/jekyll/sites
 * Fork and "Contribute":http://wiki.github.com/mojombo/jekyll/contribute your own modifications
+* Have questions? Post them on the "Mailing List":http://groups.google.com/group/jekyll-rb
 
 h2. Diving In
 
@@ -19,14 +20,21 @@ h2. Diving In
 * Customize the "Permalinks":http://wiki.github.com/mojombo/jekyll/permalinks your posts are generated with
 * Use the built-in "Liquid Extensions":http://wiki.github.com/mojombo/jekyll/liquid-extensions to make your life easier
 
-h2. Dependencies
+h2. Runtime Dependencies
 
-* RedCloth 4.1.0: Textile support. This version obeys @<notextile>@ tags. The latest version will still work, but tests will fail.
-* Liquid: Templating system
-* Classifier: Generating related posts
-* Maruku: Default markdown engine
-* Directory Watcher: Auto-regeneration of sites
-* Open4: Talking to pygments for syntax highlighting
+* RedCloth: Textile support (Ruby)
+* Liquid: Templating system (Ruby)
+* Classifier: Generating related posts (Ruby)
+* Maruku: Default markdown engine (Ruby)
+* Directory Watcher: Auto-regeneration of sites (Ruby)
+* Open4: Talking to pygments for syntax highlighting (Ruby)
+* Pygments: Syntax highlighting (Python)
+
+h2. Developer Dependencies
+
+* Shoulda: Test framework (Ruby)
+* RR: Mocking (Ruby)
+* RedGreen: Nicer test output (Ruby)
 
 h2. License
 

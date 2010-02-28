@@ -18,12 +18,9 @@ module Jekyll
       name =~ MATCHER
     end
 
-    attr_accessor :site, :date, :slug, :ext, :topics, :published, :data, :content, :output
-    attr_writer :categories
-
-    def categories
-      @categories ||= []
-    end
+    attr_accessor :site
+    attr_accessor :data, :content, :output, :ext
+    attr_accessor :date, :slug, :published, :tags, :categories
 
     # Initialize this Post instance.
     #   +site+ is the Site
@@ -38,12 +35,15 @@ module Jekyll
       @name = name
 
       self.categories = dir.split('/').reject { |x| x.empty? }
-
-      parts = name.split('/')
-      self.topics = parts.size > 1 ? parts[0..-2] : []
-
       self.process(name)
       self.read_yaml(@base, name)
+
+      #If we've added a date and time to the yaml, use that instead of the filename date
+      #Means we'll sort correctly.
+      if self.data.has_key?('date')
+        # ensure Time via to_s and reparse
+        self.date = Time.parse(self.data["date"].to_s)
+      end
 
       if self.data.has_key?('published') && self.data['published'] == false
         self.published = false
@@ -51,26 +51,22 @@ module Jekyll
         self.published = true
       end
 
+      self.tags = self.data.pluralized_array("tag", "tags")
+
       if self.categories.empty?
-        if self.data.has_key?('category')
-          self.categories << self.data['category']
-        elsif self.data.has_key?('categories')
-          # Look for categories in the YAML-header, either specified as
-          # an array or a string.
-          if self.data['categories'].kind_of? String
-            self.categories = self.data['categories'].split
-          else
-            self.categories = self.data['categories']
-          end
-        end
+        self.categories = self.data.pluralized_array('category', 'categories')
       end
     end
 
-    # Spaceship is based on Post#date
+    # Spaceship is based on Post#date, slug
     #
     # Returns -1, 0, 1
     def <=>(other)
-      self.date <=> other.date
+      cmp = self.date <=> other.date
+      if 0 == cmp
+       cmp = self.slug <=> other.slug
+      end
+      return cmp
     end
 
     # Extract information from the post filename
@@ -106,7 +102,7 @@ module Jekyll
     def template
       case self.site.permalink_style
       when :pretty
-        "/:categories/:year/:month/:day/:title"
+        "/:categories/:year/:month/:day/:title/"
       when :none
         "/:categories/:title.html"
       when :date
@@ -128,7 +124,7 @@ module Jekyll
         "month"      => date.strftime("%m"),
         "day"        => date.strftime("%d"),
         "title"      => CGI.escape(slug),
-        "categories" => categories.sort.join('/')
+        "categories" => categories.join('/')
       }.inject(template) { |result, token|
         result.gsub(/:#{token.first}/, token.last)
       }.gsub(/\/\//, "/")
@@ -205,17 +201,17 @@ module Jekyll
     #
     # Returns <Hash>
     def to_liquid
-      { "title" => self.data["title"] || self.slug.split('-').select {|w| w.capitalize! || w }.join(' '),
-        "url" => self.url,
-        "date" => self.date,
-        "id" => self.id,
-        "topics" => self.topics,
+      { "title"      => self.data["title"] || self.slug.split('-').select {|w| w.capitalize! || w }.join(' '),
+        "url"        => self.url,
+        "date"       => self.date,
+        "id"         => self.id,
         "categories" => self.categories,
-        "next" => self.next,
+        "next"       => self.next,
         "next_in_categories" => self.next_in_categories,
-        "previous" => self.previous,
+        "previous"   => self.previous,
         "previous_in_categories" => self.previous_in_categories,
-        "content" => self.content }.deep_merge(self.data)
+        "tags"       => self.tags,
+        "content"    => self.content }.deep_merge(self.data)
     end
 
     def inspect
