@@ -1,4 +1,4 @@
-require File.dirname(__FILE__) + '/helper'
+require 'helper'
 
 class TestPost < Test::Unit::TestCase
   def setup_post(file)
@@ -18,10 +18,10 @@ class TestPost < Test::Unit::TestCase
     end
 
     should "ensure valid posts are valid" do
-      assert Post.valid?("2008-10-19-foo-bar.textile")
-      assert Post.valid?("foo/bar/2008-10-19-foo-bar.textile")
+      assert Post.valid?("2008-09-09-foo-bar.textile")
+      assert Post.valid?("foo/bar/2008-09-09-foo-bar.textile")
 
-      assert !Post.valid?("lol2008-10-19-foo-bar.textile")
+      assert !Post.valid?("lol2008-09-09-foo-bar.textile")
       assert !Post.valid?("blah")
     end
 
@@ -31,7 +31,7 @@ class TestPost < Test::Unit::TestCase
         @post.site = @site
 
         @real_file = "2008-10-18-foo-bar.textile"
-        @fake_file = "2008-10-19-foo-bar.textile"
+        @fake_file = "2008-09-09-foo-bar.textile"
         @source = source_dir('_posts')
       end
 
@@ -39,17 +39,23 @@ class TestPost < Test::Unit::TestCase
         @post.categories = []
         @post.process(@fake_file)
 
-        assert_equal Time.parse("2008-10-19"), @post.date
+        assert_equal Time.parse("2008-09-09"), @post.date
         assert_equal "foo-bar", @post.slug
         assert_equal ".textile", @post.ext
-        assert_equal "/2008/10/19", @post.dir
-        assert_equal "/2008/10/19/foo-bar", @post.id
+        assert_equal "/2008/09/09", @post.dir
+        assert_equal "/2008/09/09/foo-bar", @post.id
       end
 
       should "create url based on date and title" do
         @post.categories = []
         @post.process(@fake_file)
-        assert_equal "/2008/10/19/foo-bar.html", @post.url
+        assert_equal "/2008/09/09/foo-bar.html", @post.url
+      end
+
+      should "raise a good error on invalid post date" do
+        assert_raise Jekyll::FatalException do
+          @post.process("2009-27-03-foo-bar.textile")
+        end
       end
 
       should "CGI escape urls" do
@@ -106,7 +112,7 @@ class TestPost < Test::Unit::TestCase
 
           should "process the url correctly" do
             assert_equal "/:categories/:year/:month/:day/:title.html", @post.template
-            assert_equal "/2008/10/19/foo-bar.html", @post.url
+            assert_equal "/2008/09/09/foo-bar.html", @post.url
           end
         end
 
@@ -118,7 +124,7 @@ class TestPost < Test::Unit::TestCase
 
           should "process the url correctly" do
             assert_equal "/:categories/:year/:month/:day/:title.html", @post.template
-            assert_equal "/beer/2008/10/19/foo-bar.html", @post.url
+            assert_equal "/beer/2008/09/09/foo-bar.html", @post.url
           end
         end
 
@@ -131,7 +137,7 @@ class TestPost < Test::Unit::TestCase
 
           should "process the url correctly" do
             assert_equal "/:categories/:year/:month/:day/:title.html", @post.template
-            assert_equal "/food/beer/2008/10/19/foo-bar.html", @post.url
+            assert_equal "/food/beer/2008/09/09/foo-bar.html", @post.url
           end
         end
 
@@ -155,7 +161,18 @@ class TestPost < Test::Unit::TestCase
 
           should "process the url correctly" do
             assert_equal "/:categories/:year/:month/:day/:title/", @post.template
-            assert_equal "/2008/10/19/foo-bar/", @post.url
+            assert_equal "/2008/09/09/foo-bar/", @post.url
+          end
+        end
+
+        context "with custom date permalink" do
+          setup do
+            @post.site.permalink_style = '/:categories/:year/:i_month/:i_day/:title/'
+            @post.process(@fake_file)
+          end
+
+          should "process the url correctly" do
+            assert_equal "/2008/9/9/foo-bar/", @post.url
           end
         end
 
@@ -227,12 +244,37 @@ class TestPost < Test::Unit::TestCase
 
       should "recognize date in yaml" do
         post = setup_post("2010-01-09-date-override.textile")
+        do_render(post)
+        assert_equal Time, post.date.class
+        assert_equal Time, post.to_liquid["date"].class
         assert_equal "/2010/01/10/date-override.html", post.url
+        assert_equal "<p>Post with a front matter date</p>\n<p>10 Jan 2010</p>", post.output
       end
 
       should "recognize time in yaml" do
         post = setup_post("2010-01-09-time-override.textile")
+        do_render(post)
+        assert_equal Time, post.date.class
+        assert_equal Time, post.to_liquid["date"].class
         assert_equal "/2010/01/10/time-override.html", post.url
+        assert_equal "<p>Post with a front matter time</p>\n<p>10 Jan 2010</p>", post.output
+      end
+
+      should "recognize time with timezone in yaml" do
+        post = setup_post("2010-01-09-timezone-override.textile")
+        do_render(post)
+        assert_equal Time, post.date.class
+        assert_equal Time, post.to_liquid["date"].class
+        assert_equal "/2010/01/10/timezone-override.html", post.url
+        assert_equal "<p>Post with a front matter time with timezone</p>\n<p>10 Jan 2010</p>", post.output
+      end
+
+      should "to_liquid prioritizes post attributes over data" do
+        post = setup_post("2010-01-16-override-data.textile")
+        assert_equal Array, post.tags.class
+        assert_equal Array, post.to_liquid["tags"].class
+        assert_equal Time, post.date.class
+        assert_equal Time, post.to_liquid["date"].class
       end
 
       should "recognize category in yaml" do
@@ -333,6 +375,21 @@ class TestPost < Test::Unit::TestCase
 
           assert_equal "<<< <hr />\n<p>Tom Preston-Werner github.com/mojombo</p>\n\n<p>This <em>is</em> cool</p> >>>", post.output
         end
+
+        should "render date specified in front matter properly" do
+          post = setup_post("2010-01-09-date-override.textile")
+          do_render(post)
+
+          assert_equal "<p>Post with a front matter date</p>\n<p>10 Jan 2010</p>", post.output
+        end
+
+        should "render time specified in front matter properly" do
+          post = setup_post("2010-01-09-time-override.textile")
+          do_render(post)
+
+          assert_equal "<p>Post with a front matter time</p>\n<p>10 Jan 2010</p>", post.output
+        end
+
       end
     end
 
@@ -340,6 +397,47 @@ class TestPost < Test::Unit::TestCase
       post = Post.new(@site, File.join(File.dirname(__FILE__), *%w[source]), 'foo', 'bar/2008-12-12-topical-post.textile')
       assert_equal ['foo'], post.categories
     end
-
   end
+  
+  context "converter file extension settings" do
+    setup do
+      stub(Jekyll).configuration { Jekyll::DEFAULTS }
+      @site = Site.new(Jekyll.configuration)
+    end
+    
+    should "process .md as markdown under default configuration" do
+      post = setup_post '2011-04-12-md-extension.md'
+      conv = post.converter
+      assert conv.kind_of? Jekyll::MarkdownConverter
+    end
+    
+    should "process .text as indentity under default configuration" do
+      post = setup_post '2011-04-12-text-extension.text'
+      conv = post.converter
+      assert conv.kind_of? Jekyll::IdentityConverter
+    end
+    
+    should "process .text as markdown under alternate configuration" do
+      @site.config['markdown_ext'] = 'markdown,mdw,mdwn,md,text'
+      post = setup_post '2011-04-12-text-extension.text'
+      conv = post.converter
+      assert conv.kind_of? Jekyll::MarkdownConverter
+    end
+    
+    should "process .md as markdown under alternate configuration" do
+      @site.config['markdown_ext'] = 'markdown,mkd,mkdn,md,text'
+      post = setup_post '2011-04-12-text-extension.text'
+      conv = post.converter
+      assert conv.kind_of? Jekyll::MarkdownConverter
+    end
+    
+    should "process .text as textile under alternate configuration" do
+      @site.config['textile_ext'] = 'textile,text'
+      post = setup_post '2011-04-12-text-extension.text'
+      conv = post.converter
+      assert conv.kind_of? Jekyll::TextileConverter
+    end
+    
+  end
+  
 end

@@ -78,6 +78,8 @@ module Jekyll
       self.date = Time.parse(date)
       self.slug = slug
       self.ext = ext
+    rescue ArgumentError
+      raise FatalException.new("Post #{name} does not have a valid date.")
     end
 
     # The generated directory into which the post will be placed
@@ -117,17 +119,29 @@ module Jekyll
     #
     # Returns <String>
     def url
-      return permalink if permalink
+      return @url if @url
 
-      @url ||= {
-        "year"       => date.strftime("%Y"),
-        "month"      => date.strftime("%m"),
-        "day"        => date.strftime("%d"),
-        "title"      => CGI.escape(slug),
-        "categories" => categories.join('/')
-      }.inject(template) { |result, token|
-        result.gsub(/:#{token.first}/, token.last)
-      }.gsub(/\/\//, "/")
+      url = if permalink
+        permalink
+      else
+        {
+          "year"       => date.strftime("%Y"),
+          "month"      => date.strftime("%m"),
+          "day"        => date.strftime("%d"),
+          "title"      => CGI.escape(slug),
+          "i_day"      => date.strftime("%d").to_i.to_s,
+          "i_month"    => date.strftime("%m").to_i.to_s,
+          "categories" => categories.join('/'),
+          "output_ext" => self.output_ext
+        }.inject(template) { |result, token|
+          result.gsub(/:#{Regexp.escape token.first}/, token.last)
+        }.gsub(/\/\//, "/")
+      end
+
+      # sanitize url
+      @url = url.split('/').reject{ |part| part =~ /^\.+$/ }.join('/')
+      @url += "/" if url =~ /\/$/
+      @url
     end
 
     # The UID for this post (useful in feeds)
@@ -167,14 +181,23 @@ module Jekyll
     # Returns nothing
     def render(layouts, site_payload)
       # construct payload
-      payload =
-      {
+      payload = {
         "site" => { "related_posts" => related_posts(site_payload["site"]["posts"]) },
         "page" => self.to_liquid
-      }
-      payload = payload.deep_merge(site_payload)
+      }.deep_merge(site_payload)
 
       do_layout(payload, layouts)
+    end
+    
+    # Obtain destination path.
+    #   +dest+ is the String path to the destination dir
+    #
+    # Returns destination file path.
+    def destination(dest)
+      # The url needs to be unescaped in order to preserve the correct filename
+      path = File.join(dest, CGI.unescape(self.url))
+      path = File.join(path, "index.html") if template[/\.html$/].nil?
+      path
     end
 
     # Write the generated post file to the destination directory.
@@ -182,16 +205,8 @@ module Jekyll
     #
     # Returns nothing
     def write(dest)
-      FileUtils.mkdir_p(File.join(dest, dir))
-
-      # The url needs to be unescaped in order to preserve the correct filename
-      path = File.join(dest, CGI.unescape(self.url))
-
-      if template[/\.html$/].nil?
-        FileUtils.mkdir_p(path)
-        path = File.join(path, "index.html")
-      end
-
+      path = destination(dest)
+      FileUtils.mkdir_p(File.dirname(path))
       File.open(path, 'w') do |f|
         f.write(self.output)
       end
@@ -201,7 +216,8 @@ module Jekyll
     #
     # Returns <Hash>
     def to_liquid
-      { "title"      => self.data["title"] || self.slug.split('-').select {|w| w.capitalize! || w }.join(' '),
+      self.data.deep_merge({
+        "title"      => self.data["title"] || self.slug.split('-').select {|w| w.capitalize! || w }.join(' '),
         "url"        => self.url,
         "date"       => self.date,
         "id"         => self.id,
@@ -211,7 +227,7 @@ module Jekyll
         "previous"   => self.previous,
         "previous_in_categories" => self.previous_in_categories,
         "tags"       => self.tags,
-        "content"    => self.content }.deep_merge(self.data)
+        "content"    => self.content })
     end
 
     def inspect

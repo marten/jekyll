@@ -1,9 +1,9 @@
-require File.dirname(__FILE__) + '/helper'
+require 'helper'
 
 class TestConfiguration < Test::Unit::TestCase
   context "loading configuration" do
     setup do
-      @path = './_config.yml'
+      @path = File.join(Dir.pwd, '_config.yml')
     end
 
     should "fire warning with no _config.yml" do
